@@ -1,175 +1,197 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>チーム分けツール</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 1em;
-      max-width: 600px;
-      margin: auto;
-    }
-    input, button {
-      margin: 5px 0;
-      padding: 0.5em;
-      font-size: 1em;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    ul {
-      padding-left: 1.2em;
-    }
-    h1, h2 {
-      font-size: 1.2em;
-    }
-    button {
-      cursor: pointer;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チーム分けツール</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 1em;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        input, button, select {
+            margin: 5px 0;
+            padding: 0.5em;
+            font-size: 1em;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        ul {
+            padding-left: 1.2em;
+        }
+
+        h1, h2 {
+            font-size: 1.2em;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .section {
+            margin-top: 1em;
+        }
+    </style>
 </head>
 <body>
-  <h1>ランダムチーム分け（保存・固定・編集対応）</h1>
+    <h1>ランダムチーム分け（保存・固定・編集対応）</h1>
 
-  <h2>設定</h2>
-  チーム1名: <input type="text" id="team1Name" value="東">
-  人数: <input type="number" id="team1Size" value="3" min="1"><br>
-  チーム2名: <input type="text" id="team2Name" value="西">
-  人数: <input type="number" id="team2Size" value="3" min="1"><br>
+    <div class="section">
+        <h2>設定</h2>
+        チーム1名: <input type="text" id="team1Name" value="東">
+        人数: <input type="number" id="team1Size" value="3" min="1"><br>
+        チーム2名: <input type="text" id="team2Name" value="西">
+        人数: <input type="number" id="team2Size" value="3" min="1">
+    </div>
 
-  固定メンバー（常にチーム1）: <input type="text" id="fixedName">
-  <button onclick="addFixedName()">追加</button>
-  <ul id="fixedList"></ul>
+    <div class="section">
+        <h2>固定メンバー追加</h2>
+        <select id="fixedSelector"></select>
+        <button onclick="addFixedName(1)">チーム1に固定</button>
+        <button onclick="addFixedName(2)">チーム2に固定</button>
+        <h3>チーム1固定:</h3>
+        <ul id="fixedList1"></ul>
+        <h3>チーム2固定:</h3>
+        <ul id="fixedList2"></ul>
+    </div>
 
-  <h2>名前追加</h2>
-  <input type="text" id="nameInput" placeholder="名前を入力">
-  <button onclick="addName()">追加</button>
-  <button onclick="clearNames()">全削除</button>
-  <ul id="nameList"></ul>
+    <div class="section">
+        <h2>抽選対象メンバー</h2>
+        <ul id="nameList"></ul>
+    </div>
 
-  <button onclick="shuffleAndDisplay()">チーム分けする</button>
+    <button onclick="shuffleAndDisplay()">チーム分けする</button>
 
-  <h2 id="team1Header">東チーム</h2>
-  <ul id="team1"></ul>
+    <h2 id="team1Header">東チーム</h2>
+    <ul id="team1"></ul>
 
-  <h2 id="team2Header">西チーム</h2>
-  <ul id="team2"></ul>
+    <h2 id="team2Header">西チーム</h2>
+    <ul id="team2"></ul>
 
-  <h2>観戦</h2>
-  <ul id="spectators"></ul>
+    <h2>観戦</h2>
+    <ul id="spectators"></ul>
 
-  <script>
-    function getSavedNames() {
-      const saved = localStorage.getItem("names");
-      return saved ? JSON.parse(saved) : [];
-    }
+    <script>
+        const defaultNames = [
+            "Alastor", "Jack", "IVE", "あんな", "うらら", "おおばん", "おぱん", "かなもと", "かまちゃん", "さとめぐ",
+            "みゆゅ", "ゆかいもん", "ゆめ", "ゆらみそ", "ゆりこ", "りにゃ", "正気"
+        ];
 
-    function saveNames(names) {
-      localStorage.setItem("names", JSON.stringify(names));
-    }
+        function initData() {
+            if (!localStorage.getItem("names")) {
+                localStorage.setItem("names", JSON.stringify(defaultNames));
+            }
+            if (!localStorage.getItem("fixed1")) {
+                localStorage.setItem("fixed1", JSON.stringify([]));
+            }
+            if (!localStorage.getItem("fixed2")) {
+                localStorage.setItem("fixed2", JSON.stringify([]));
+            }
+        }
 
-    function getFixedNames() {
-      const saved = localStorage.getItem("fixedNames");
-      return saved ? JSON.parse(saved) : [];
-    }
+        function getNames() {
+            return JSON.parse(localStorage.getItem("names")) || [];
+        }
 
-    function saveFixedNames(names) {
-      localStorage.setItem("fixedNames", JSON.stringify(names));
-    }
+        function getFixed(team) {
+            return JSON.parse(localStorage.getItem("fixed" + team)) || [];
+        }
 
-    function renderNames() {
-      const names = getSavedNames();
-      const list = document.getElementById("nameList");
-      list.innerHTML = names.map((name, index) => `<li>${name} <button onclick=\"removeName(${index})\">削除</button></li>`).join('');
-    }
+        function saveFixed(team, list) {
+            localStorage.setItem("fixed" + team, JSON.stringify(list));
+        }
 
-    function renderFixedNames() {
-      const fixed = getFixedNames();
-      const list = document.getElementById("fixedList");
-      list.innerHTML = fixed.map((name, index) => `<li>${name} <button onclick=\"removeFixedName(${index})\">削除</button></li>`).join('');
-    }
+        function updateSelectors() {
+            const all = getNames();
+            const fixed1 = getFixed(1);
+            const fixed2 = getFixed(2);
+            const available = all.filter(name => !fixed1.includes(name) && !fixed2.includes(name));
 
-    function addName() {
-      const input = document.getElementById("nameInput");
-      const name = input.value.trim();
-      if (name) {
-        const names = getSavedNames();
-        names.push(name);
-        saveNames(names);
-        renderNames();
-        input.value = "";
-      }
-    }
+            const selector = document.getElementById("fixedSelector");
+            selector.innerHTML = available.map(name => `<option value="${name}">${name}</option>`).join('');
+        }
 
-    function removeName(index) {
-      const names = getSavedNames();
-      names.splice(index, 1);
-      saveNames(names);
-      renderNames();
-    }
+        function renderFixedLists() {
+            const list1 = getFixed(1);
+            const list2 = getFixed(2);
+            const ul1 = document.getElementById("fixedList1");
+            const ul2 = document.getElementById("fixedList2");
 
-    function clearNames() {
-      localStorage.removeItem("names");
-      renderNames();
-    }
+            ul1.innerHTML = list1.map((name, i) => `<li>${name} <button onclick="removeFixed(${i}, 1)">削除</button></li>`).join('');
+            ul2.innerHTML = list2.map((name, i) => `<li>${name} <button onclick="removeFixed(${i}, 2)">削除</button></li>`).join('');
+        }
 
-    function addFixedName() {
-      const input = document.getElementById("fixedName");
-      const name = input.value.trim();
-      if (name) {
-        const fixed = getFixedNames();
-        fixed.push(name);
-        saveFixedNames(fixed);
-        renderFixedNames();
-        input.value = "";
-      }
-    }
+        function renderNameList() {
+            const all = getNames();
+            const fixed1 = getFixed(1);
+            const fixed2 = getFixed(2);
+            const randomList = all.filter(name => !fixed1.includes(name) && !fixed2.includes(name));
+            const list = document.getElementById("nameList");
+            list.innerHTML = randomList.map(name => `<li>${name}</li>`).join('');
+        }
 
-    function removeFixedName(index) {
-      const fixed = getFixedNames();
-      fixed.splice(index, 1);
-      saveFixedNames(fixed);
-      renderFixedNames();
-    }
+        function addFixedName(team) {
+            const selector = document.getElementById("fixedSelector");
+            const name = selector.value;
+            if (!name) return;
+            const fixed = getFixed(team);
+            fixed.push(name);
+            saveFixed(team, fixed);
+            updateSelectors();
+            renderFixedLists();
+            renderNameList();
+        }
 
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-    }
+        function removeFixed(index, team) {
+            const fixed = getFixed(team);
+            fixed.splice(index, 1);
+            saveFixed(team, fixed);
+            updateSelectors();
+            renderFixedLists();
+            renderNameList();
+        }
 
-    function shuffleAndDisplay() {
-      const team1Name = document.getElementById("team1Name").value || "チーム1";
-      const team2Name = document.getElementById("team2Name").value || "チーム2";
-      const team1Size = parseInt(document.getElementById("team1Size").value);
-      const team2Size = parseInt(document.getElementById("team2Size").value);
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
 
-      const all = getSavedNames();
-      const fixed = getFixedNames();
+        function shuffleAndDisplay() {
+            const team1Name = document.getElementById("team1Name").value || "チーム1";
+            const team2Name = document.getElementById("team2Name").value || "チーム2";
+            const team1Size = parseInt(document.getElementById("team1Size").value);
+            const team2Size = parseInt(document.getElementById("team2Size").value);
 
-      // 固定されたメンバーは team1 に先に入れる
-      const rest = all.filter(name => !fixed.includes(name));
-      shuffle(rest);
+            const all = getNames();
+            const fixed1 = getFixed(1);
+            const fixed2 = getFixed(2);
+            const pool = all.filter(name => !fixed1.includes(name) && !fixed2.includes(name));
 
-      const team1 = [...fixed];
-      const remainingForTeam1 = team1Size - team1.length;
-      team1.push(...rest.splice(0, remainingForTeam1));
+            shuffle(pool);
 
-      const team2 = rest.splice(0, team2Size);
-      const spectators = rest;
+            const team1 = [...fixed1, ...pool.splice(0, team1Size - fixed1.length)];
+            const team2 = [...fixed2, ...pool.splice(0, team2Size - fixed2.length)];
+            const spectators = pool;
 
-      document.getElementById("team1Header").innerText = team1Name;
-      document.getElementById("team2Header").innerText = team2Name;
+            document.getElementById("team1Header").innerText = team1Name;
+            document.getElementById("team2Header").innerText = team2Name;
 
-      document.getElementById("team1").innerHTML = team1.map(name => `<li>${name}</li>`).join('');
-      document.getElementById("team2").innerHTML = team2.map(name => `<li>${name}</li>`).join('');
-      document.getElementById("spectators").innerHTML = spectators.map(name => `<li>${name}</li>`).join('');
-    }
+            document.getElementById("team1").innerHTML = team1.map(name => `<li>${name}</li>`).join('');
+            document.getElementById("team2").innerHTML = team2.map(name => `<li>${name}</li>`).join('');
+            document.getElementById("spectators").innerHTML = spectators.map(name => `<li>${name}</li>`).join('');
+        }
 
-    renderNames();
-    renderFixedNames();
-  </script>
+        // 初期化
+        initData();
+        updateSelectors();
+        renderFixedLists();
+        renderNameList();
+    </script>
 </body>
 </html>
