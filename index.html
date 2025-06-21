@@ -24,7 +24,7 @@
             padding-left: 1.2em;
         }
 
-        h1, h2 {
+        h1, h2, h3 {
             font-size: 1.2em;
         }
 
@@ -46,6 +46,13 @@
         人数: <input type="number" id="team1Size" value="3" min="1"><br>
         チーム2名: <input type="text" id="team2Name" value="西">
         人数: <input type="number" id="team2Size" value="3" min="1">
+    </div>
+
+    <div class="section">
+        <h2>メンバー管理</h2>
+        <input type="text" id="newMember" placeholder="名前を入力">
+        <button onclick="addMember()">メンバー追加</button>
+        <ul id="allMembers"></ul>
     </div>
 
     <div class="section">
@@ -97,6 +104,10 @@
             return JSON.parse(localStorage.getItem("names")) || [];
         }
 
+        function saveNames(names) {
+            localStorage.setItem("names", JSON.stringify(names));
+        }
+
         function getFixed(team) {
             return JSON.parse(localStorage.getItem("fixed" + team)) || [];
         }
@@ -134,6 +145,49 @@
             list.innerHTML = randomList.map(name => `<li>${name}</li>`).join('');
         }
 
+        function renderAllMembers() {
+            const names = getNames();
+            const ul = document.getElementById("allMembers");
+            ul.innerHTML = names.map((name, i) => `<li>${name} <button onclick="removeMember(${i})">削除</button></li>`).join('');
+            updateSelectors();
+            renderNameList();
+        }
+
+        function addMember() {
+            const input = document.getElementById("newMember");
+            const name = input.value.trim();
+            if (name) {
+                const names = getNames();
+                if (!names.includes(name)) {
+                    names.push(name);
+                    saveNames(names);
+                    input.value = "";
+                    renderAllMembers();
+                }
+            }
+        }
+
+        function removeMember(index) {
+            const names = getNames();
+            const fixed1 = getFixed(1);
+            const fixed2 = getFixed(2);
+            const name = names[index];
+
+            // 固定に含まれていたら削除
+            if (fixed1.includes(name)) {
+                fixed1.splice(fixed1.indexOf(name), 1);
+                saveFixed(1, fixed1);
+            }
+            if (fixed2.includes(name)) {
+                fixed2.splice(fixed2.indexOf(name), 1);
+                saveFixed(2, fixed2);
+            }
+
+            names.splice(index, 1);
+            saveNames(names);
+            renderAllMembers();
+        }
+
         function addFixedName(team) {
             const selector = document.getElementById("fixedSelector");
             const name = selector.value;
@@ -144,6 +198,7 @@
             updateSelectors();
             renderFixedLists();
             renderNameList();
+            renderAllMembers();
         }
 
         function removeFixed(index, team) {
@@ -153,6 +208,7 @@
             updateSelectors();
             renderFixedLists();
             renderNameList();
+            renderAllMembers();
         }
 
         function shuffle(array) {
@@ -189,9 +245,8 @@
 
         // 初期化
         initData();
-        updateSelectors();
+        renderAllMembers();
         renderFixedLists();
-        renderNameList();
     </script>
 </body>
 </html>
