@@ -38,13 +38,13 @@
     </style>
 </head>
 <body>
-    <h1>ドッヂボール地獄カスタム用</h1>
+    <h1>ランダムチーム分け（メンバー・抽選分離対応）</h1>
 
     <div class="section">
         <h2>設定</h2>
-        チーム1の名前: <input type="text" id="team1Name" value="東">
+        チーム1名: <input type="text" id="team1Name" value="東">
         人数: <input type="number" id="team1Size" value="3" min="1"><br>
-        チーム2の名前: <input type="text" id="team2Name" value="西">
+        チーム2名: <input type="text" id="team2Name" value="西">
         人数: <input type="number" id="team2Size" value="3" min="1">
     </div>
 
@@ -56,19 +56,21 @@
     </div>
 
     <div class="section">
-        <h2>絶対にやらないといけない人</h2>
-        <select id="fixedSelector"></select>
-        <button onclick="addFixedName(1)">チーム1に固定</button>
-        <button onclick="addFixedName(2)">チーム2に固定</button>
-        <h3>チーム1に固定:</h3>
-        <ul id="fixedList1"></ul>
-        <h3>チーム2に固定:</h3>
-        <ul id="fixedList2"></ul>
+        <h2>抽選メンバー管理</h2>
+        <select id="selectForDraw"></select>
+        <button onclick="addToDrawPool()">抽選メンバーに追加</button>
+        <ul id="drawList"></ul>
     </div>
 
     <div class="section">
-        <h2>抽選対象メンバー</h2>
-        <ul id="nameList"></ul>
+        <h2>固定メンバー</h2>
+        <select id="fixedSelector"></select>
+        <button onclick="addFixedName(1)">チーム1に固定</button>
+        <button onclick="addFixedName(2)">チーム2に固定</button>
+        <h3>チーム1固定:</h3>
+        <ul id="fixedList1"></ul>
+        <h3>チーム2固定:</h3>
+        <ul id="fixedList2"></ul>
     </div>
 
     <button onclick="shuffleAndDisplay()">チーム分けする</button>
@@ -89,8 +91,11 @@
         ];
 
         function initData() {
-            if (!localStorage.getItem("names")) {
-                localStorage.setItem("names", JSON.stringify(defaultNames));
+            if (!localStorage.getItem("members")) {
+                localStorage.setItem("members", JSON.stringify(defaultNames));
+            }
+            if (!localStorage.getItem("drawPool")) {
+                localStorage.setItem("drawPool", JSON.stringify([]));
             }
             if (!localStorage.getItem("fixed1")) {
                 localStorage.setItem("fixed1", JSON.stringify([]));
@@ -100,92 +105,97 @@
             }
         }
 
-        function getNames() {
-            return JSON.parse(localStorage.getItem("names")) || [];
+        function getMembers() {
+            return JSON.parse(localStorage.getItem("members")) || [];
+        }
+        function saveMembers(members) {
+            localStorage.setItem("members", JSON.stringify(members));
         }
 
-        function saveNames(names) {
-            localStorage.setItem("names", JSON.stringify(names));
+        function getDrawPool() {
+            return JSON.parse(localStorage.getItem("drawPool")) || [];
+        }
+        function saveDrawPool(pool) {
+            localStorage.setItem("drawPool", JSON.stringify(pool));
         }
 
         function getFixed(team) {
             return JSON.parse(localStorage.getItem("fixed" + team)) || [];
         }
-
         function saveFixed(team, list) {
             localStorage.setItem("fixed" + team, JSON.stringify(list));
         }
 
-        function updateSelectors() {
-            const all = getNames();
-            const fixed1 = getFixed(1);
-            const fixed2 = getFixed(2);
-            const available = all.filter(name => !fixed1.includes(name) && !fixed2.includes(name));
-
-            const selector = document.getElementById("fixedSelector");
-            selector.innerHTML = available.map(name => `<option value="${name}">${name}</option>`).join('');
-        }
-
-        function renderFixedLists() {
-            const list1 = getFixed(1);
-            const list2 = getFixed(2);
-            const ul1 = document.getElementById("fixedList1");
-            const ul2 = document.getElementById("fixedList2");
-
-            ul1.innerHTML = list1.map((name, i) => `<li>${name} <button onclick="removeFixed(${i}, 1)">削除</button></li>`).join('');
-            ul2.innerHTML = list2.map((name, i) => `<li>${name} <button onclick="removeFixed(${i}, 2)">削除</button></li>`).join('');
-        }
-
-        function renderNameList() {
-            const all = getNames();
-            const fixed1 = getFixed(1);
-            const fixed2 = getFixed(2);
-            const randomList = all.filter(name => !fixed1.includes(name) && !fixed2.includes(name));
-            const list = document.getElementById("nameList");
-            list.innerHTML = randomList.map(name => `<li>${name}</li>`).join('');
-        }
-
         function renderAllMembers() {
-            const names = getNames();
+            const members = getMembers();
             const ul = document.getElementById("allMembers");
-            ul.innerHTML = names.map((name, i) => `<li>${name} <button onclick="removeMember(${i})">削除</button></li>`).join('');
+            ul.innerHTML = members.map((name, i) => `<li>${name} <button onclick="removeMember(${i})">削除</button></li>`).join('');
             updateSelectors();
-            renderNameList();
+        }
+
+        function renderDrawList() {
+            const list = getDrawPool();
+            const ul = document.getElementById("drawList");
+            ul.innerHTML = list.map((name, i) => `<li>${name} <button onclick="removeFromDrawPool(${i})">抽選から外す</button></li>`).join('');
+        }
+
+        function updateSelectors() {
+            const all = getMembers();
+            const fixed1 = getFixed(1);
+            const fixed2 = getFixed(2);
+            const draw = getDrawPool();
+
+            const available = all.filter(name => !fixed1.includes(name) && !fixed2.includes(name));
+            const drawable = all.filter(name => !draw.includes(name));
+
+            document.getElementById("fixedSelector").innerHTML = available.map(name => `<option value="${name}">${name}</option>`).join('');
+            document.getElementById("selectForDraw").innerHTML = drawable.map(name => `<option value="${name}">${name}</option>`).join('');
         }
 
         function addMember() {
             const input = document.getElementById("newMember");
             const name = input.value.trim();
-            if (name) {
-                const names = getNames();
-                if (!names.includes(name)) {
-                    names.push(name);
-                    saveNames(names);
-                    input.value = "";
-                    renderAllMembers();
-                }
+            if (!name) return;
+            const members = getMembers();
+            if (!members.includes(name)) {
+                members.push(name);
+                saveMembers(members);
+                input.value = "";
+                renderAllMembers();
+                updateSelectors();
             }
         }
 
         function removeMember(index) {
-            const names = getNames();
-            const fixed1 = getFixed(1);
-            const fixed2 = getFixed(2);
-            const name = names[index];
-
-            // 固定に含まれていたら削除
-            if (fixed1.includes(name)) {
-                fixed1.splice(fixed1.indexOf(name), 1);
-                saveFixed(1, fixed1);
-            }
-            if (fixed2.includes(name)) {
-                fixed2.splice(fixed2.indexOf(name), 1);
-                saveFixed(2, fixed2);
-            }
-
-            names.splice(index, 1);
-            saveNames(names);
+            const members = getMembers();
+            members.splice(index, 1);
+            saveMembers(members);
+            const drawPool = getDrawPool().filter(name => members.includes(name));
+            saveDrawPool(drawPool);
             renderAllMembers();
+            renderDrawList();
+            updateSelectors();
+        }
+
+        function addToDrawPool() {
+            const selector = document.getElementById("selectForDraw");
+            const name = selector.value;
+            if (!name) return;
+            const draw = getDrawPool();
+            if (!draw.includes(name)) {
+                draw.push(name);
+                saveDrawPool(draw);
+                renderDrawList();
+                updateSelectors();
+            }
+        }
+
+        function removeFromDrawPool(index) {
+            const draw = getDrawPool();
+            draw.splice(index, 1);
+            saveDrawPool(draw);
+            renderDrawList();
+            updateSelectors();
         }
 
         function addFixedName(team) {
@@ -193,12 +203,12 @@
             const name = selector.value;
             if (!name) return;
             const fixed = getFixed(team);
-            fixed.push(name);
-            saveFixed(team, fixed);
-            updateSelectors();
-            renderFixedLists();
-            renderNameList();
-            renderAllMembers();
+            if (!fixed.includes(name)) {
+                fixed.push(name);
+                saveFixed(team, fixed);
+                updateSelectors();
+                renderFixedLists();
+            }
         }
 
         function removeFixed(index, team) {
@@ -207,8 +217,13 @@
             saveFixed(team, fixed);
             updateSelectors();
             renderFixedLists();
-            renderNameList();
-            renderAllMembers();
+        }
+
+        function renderFixedLists() {
+            const list1 = getFixed(1);
+            const list2 = getFixed(2);
+            document.getElementById("fixedList1").innerHTML = list1.map((name, i) => `<li>${name} <button onclick="removeFixed(${i}, 1)">削除</button></li>`).join('');
+            document.getElementById("fixedList2").innerHTML = list2.map((name, i) => `<li>${name} <button onclick="removeFixed(${i}, 2)">削除</button></li>`).join('');
         }
 
         function shuffle(array) {
@@ -224,10 +239,9 @@
             const team1Size = parseInt(document.getElementById("team1Size").value);
             const team2Size = parseInt(document.getElementById("team2Size").value);
 
-            const all = getNames();
             const fixed1 = getFixed(1);
             const fixed2 = getFixed(2);
-            const pool = all.filter(name => !fixed1.includes(name) && !fixed2.includes(name));
+            const pool = getDrawPool().filter(name => !fixed1.includes(name) && !fixed2.includes(name));
 
             shuffle(pool);
 
@@ -243,9 +257,9 @@
             document.getElementById("spectators").innerHTML = spectators.map(name => `<li>${name}</li>`).join('');
         }
 
-        // 初期化
         initData();
         renderAllMembers();
+        renderDrawList();
         renderFixedLists();
     </script>
 </body>
